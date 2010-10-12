@@ -1,0 +1,21 @@
+########################################
+# Win32 (Visual C++)
+########################################
+
+CC = "cl" -nologo
+CXX = "cl" -EHsc -nologo
+AR = "link" -lib -nologo
+LINK = "link" -nologo
+ifeq ($(DEBUG), yes)
+ LINK = "link" -nologo -debug
+endif
+
+CFLAGS = -W3 -wd4996
+CDEFINES = -DWIN32 -D_CRT_SECURE_NO_DEPRECATE
+ifeq ($(DEBUG), yes)
+ OPTFLAG = -Od -MTd -Zi
+else
+ OPTFLAG = -O2 -MT
+endif
+
+FBXLIB = fbx.lib gdi32.lib user32.lib

@@ -1,4 +1,5 @@
-include ../Makerules
+TOPDIR=.
+include Makerules
 
 TARGETS = $(EDIR)/wglreadtest.exe \
           $(EDIR)/wglspheres.exe \
@@ -14,13 +15,15 @@ OBJS = $(FOBJS) \
        $(ODIR)/wglreadtest.obj \
        $(ODIR)/wglspheres.obj
 
-all: $(TARGETS)
+all: util $(TARGETS)
+
+.PHONY: util
+util:
+	cd $@; $(MAKE); cd ..
 
 clean:
-	-$(RM) $(TARGETS) $(OBJS)
-
-CFLAGS := $(subst -I$(TOPDIR)/$(platform)$(subplatform)/include/xdk ,,$(CFLAGS))
-CXXFLAGS := $(subst -I$(TOPDIR)/$(platform)$(subplatform)/include/xdk ,,$(CXXFLAGS))
+	-$(RM) $(TARGETS) $(OBJS); \
+	cd util; $(MAKE) clean; cd ..
 
 HDRS := $(wildcard ../include/*.h) $(wildcard *.h)
 $(OBJS): $(HDRS)
@@ -41,11 +44,7 @@ $(EDIR)/faker.dll: $(FOBJS)
 $(EDIR)/vglrun.bat: vglrun.bat
 	cp $< $@
 
-ifneq ($(DISTRO),)
-WBLDDIR = $(TOPDIR)\\$(platform)$(subplatform)\\$(DISTRO)
-else
 WBLDDIR = $(TOPDIR)\\$(platform)$(subplatform)
-endif
 
 ifeq ($(DEBUG), yes)
 WBLDDIR := $(WBLDDIR)\\dbg

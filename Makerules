@@ -1,0 +1,98 @@
+APPNAME = VirtualGL
+
+OS := $(shell uname -s)
+ARCH := $(shell uname -m)
+
+platform := windows
+subplatform :=
+
+ifeq ($(TOPDIR),)
+ TOPDIR = ..
+endif
+
+_DUMMY0 := $(shell if [ ! -f $(TOPDIR)/config ]; then touch $(TOPDIR)/config; fi)
+include $(TOPDIR)/config
+
+ifeq ($(M32), yes)
+ subplatform :=
+endif
+
+_DUMMY1 := $(shell if [ ! -f $(TOPDIR)/config.$(platform)$(subplatform) ]; then touch $(TOPDIR)/config.$(platform)$(subplatform); fi)
+include $(TOPDIR)/config.$(platform)$(subplatform)
+
+# Macros which are common to all Unix platforms
+VERSION := 0.1
+BUILD := $(shell date +%Y%m%d)
+ifeq ($(DEBUG), yes)
+ BUILD := $(BUILD)d
+endif
+
+BLDDIR = $(TOPDIR)/$(platform)$(subplatform)
+BLDDIR32 = $(TOPDIR)/$(platform)
+
+ifeq ($(DEBUG), yes)
+ BLDDIR := $(BLDDIR)/dbg
+ BLDDIR32 := $(BLDDIR32)/dbg
+endif
+
+ENAME = bin
+LNAME = lib
+ifeq ($(ONAME),)
+ ONAME := obj
+endif
+
+EDIR := $(BLDDIR)/$(ENAME)
+EDIR32 := $(BLDDIR32)/$(ENAME)
+LDIR := $(BLDDIR)/$(LNAME)
+LDIR32 := $(BLDDIR32)/$(LNAME)
+ODIR := $(BLDDIR)/$(ONAME)
+ODIR32 := $(BLDDIR32)/$(ONAME)
+
+_DUMMY := $(shell mkdir -p $(EDIR))
+_DUMMY2 := $(shell mkdir -p $(LDIR))
+_DUMMY3 := $(shell mkdir -p $(ODIR))
+
+RM = rm -f
+INSTALL = install
+
+# System-specific macros
+include $(TOPDIR)/Makerules.$(platform)
+
+CINCLUDES := $(CINCLUDES) -I$(TOPDIR)/$(platform)/include -I$(TOPDIR)/include -I.
+CDEFINES := $(CDEFINES) -D__VERSION=\"$(VERSION)\" -D__BUILD=\"$(BUILD)\" -D__APPNAME=\"$(APPNAME)\"
+ifeq ($(DEBUG), yes)
+ CDEFINES := $(CDEFINES) -D__DEBUG__
+endif
+ifeq ($(USEXV), yes)
+ CDEFINES := $(CDEFINES) -DUSEXV
+endif
+ifeq ($(CXXFLAGS),)
+ CXXFLAGS := $(CFLAGS)
+endif
+CFLAGS := $(CFLAGS) $(OPTFLAG) $(ARCHFLAG) $(CDEFINES) $(CINCLUDES)
+CXXFLAGS := $(CXXFLAGS) $(OPTFLAG) $(ARCHFLAG) $(CDEFINES) $(CINCLUDES)
+ifeq ($(platform), windows)
+ LDFLAGS := -LIBPATH:$(LDIR) $(LDFLAGS)
+else
+ LDFLAGS := $(OPTFLAG) $(ARCHFLAG) -L$(LDIR) $(LDFLAGS)
+endif
+
+# Implicit rules
+$(ODIR)/%.obj: %.c
+	$(CC) $(CFLAGS) -c $< -Fo$@
+
+$(ODIR)/%.obj: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -Fo$@
+
+$(ODIR)/%.obj: %.cxx
+	$(CXX) $(CXXFLAGS) -c $< -Fo$@
+
+$(LDIR)/%.lib: $(ODIR)/%.obj
+	$(AR) -out:$@ $<
+
+# This assures that the "clean" command runs even if there is a file called
+# "clean" in the current directory
+.PHONY : clean
+
+include $(TOPDIR)/config
+include $(TOPDIR)/config.$(platform)$(subplatform)
