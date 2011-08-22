@@ -299,7 +299,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 			return 0;
 		case WM_PAINT:
 			dodisplay=1;
-			return 0;
+			break;
 		case WM_SIZE:
 			reshape(LOWORD(lParam), HIWORD(lParam));
 			return 0;
