@@ -298,8 +298,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 			PostQuitMessage(0);
 			return 0;
 		case WM_PAINT:
-			dodisplay=1;
-			break;
+			if(interactive) dodisplay=1;
+			return 0;
 		case WM_SIZE:
 			reshape(LOWORD(lParam), HIWORD(lParam));
 			return 0;
@@ -426,7 +426,8 @@ int main(int argc, char **argv)
 	while(1)
 	{
 		BOOL ret;
-		advance=0, dodisplay=0;
+		advance=0;  dodisplay=0;
+
 		if((ret=GetMessage(&msg, NULL, 0, 0))==-1)
 			{_throww32("GetMessage() failed");}
 		else if(ret==0) break;
