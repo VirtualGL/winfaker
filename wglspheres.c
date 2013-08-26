@@ -1,4 +1,5 @@
 /* Copyright (C)2008 Sun Microsystems, Inc.
+ * Copyright (C)2013 D. R. Commander
  *
  * This library is free software and may be redistributed and/or modified under
  * the terms of the wxWindows Library License, Version 3 or (at your option)
@@ -12,7 +13,7 @@
  */
 
 /* This program's goal is to reproduce, as closely as possible, the image
-   output of the NVidia SphereMark demo by R. Stephen Glanville using the
+   output of the nVidia SphereMark demo by R. Stephen Glanville using the
    simplest available rendering method.  GLXSpheres is meant primarily to
    serve as an image pipeline benchmark for VirtualGL. */
 
@@ -26,6 +27,9 @@
 #include <math.h>
 #include "rrtimer.h"
 
+
+#define snprintf(str, n, format, ...)  \
+  _snprintf_s(str, n, _TRUNCATE, format, __VA_ARGS__)
 
 static char __lasterror[1024]="No error";
 #define _throw(m) {fprintf(stderr, "ERROR in line %d:\n%s\n", __LINE__,  m); \
@@ -56,9 +60,13 @@ static char __lasterror[1024]="No error";
 #define _2PI 6.283185307180
 #define MAXI (220./255.)
 
+#define DEFBENCHTIME 2.0
+
 
 HWND win=0;  HDC hdc=0;
-int usestereo=0, useimm=0, interactive=0, locolor=0;
+int usestereo=0, useimm=0, interactive=0, locolor=0, maxframes=0,
+	totalframes=0;
+double benchtime=DEFBENCHTIME;
 HGLRC ctx=0;
 
 int spherelist=0, fontlistbase=0;
@@ -69,6 +77,7 @@ float outer_angle=0., middle_angle=0., inner_angle=0.;
 float lonesphere_color=0.;
 unsigned int transpixel=0;
 int dodisplay=0, advance=0;
+
 int width=DEF_WIDTH, height=DEF_HEIGHT;
 
 
@@ -211,7 +220,7 @@ int display(int advance)
 			glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 180.);
 			glEnable(GL_LIGHTING);
 			glEnable(GL_LIGHT0);
-  	}
+		}
 
 		if(locolor) glShadeModel(GL_FLAT);
 		else glShadeModel(GL_SMOOTH);
@@ -228,7 +237,7 @@ int display(int advance)
 				NULL))
 				fprintf(stderr, "         %s", __lasterror);
 		}
-		_snprintf(temps, 255, "Measuring performance ...");
+		snprintf(temps, 255, "Measuring performance ...");
 
 		first=0;
 	}
@@ -268,16 +277,17 @@ int display(int advance)
 
 	if(start>0.)
 	{
-		elapsed+=rrtime()-start;  frames++;
+		elapsed+=rrtime()-start;  frames++;  totalframes++;
 		mpixels+=(double)width*(double)height/1000000.;
-		if(elapsed>2.)
+		if(elapsed>benchtime || (maxframes && totalframes>maxframes))
 		{
-			_snprintf(temps, 255, "%f frames/sec - %f Mpixels/sec",
+			snprintf(temps, 255, "%f frames/sec - %f Mpixels/sec",
 				(double)frames/elapsed, mpixels/elapsed);
 			printf("%s\n", temps);
 			elapsed=mpixels=0.;  frames=0;
 		}
 	}
+	if(maxframes && totalframes>maxframes) goto bailout;
 
 	start=rrtime();
 	return 0;
@@ -324,14 +334,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 
 void usage(char **argv)
 {
-	printf("USAGE: %s [-h|-?] [-i] [-l] [-m] [-s] [-fs] [-p <p>]\n\n", argv[0]);
+	printf("\nUSAGE: %s [options]\n\n", argv[0]);
+	printf("Options:\n");
+	printf("-fs = Full-screen mode\n");
 	printf("-i = Interactive mode.  Frames advance in response to mouse movement\n");
-	printf("-l = Generate an image with < 24 colors (useful for testing TurboVNC)\n");
+	printf("-l = Use fewer than 24 colors (to force non-JPEG encoding in TurboVNC)\n");
 	printf("-m = Use immediate mode rendering (default is display list)\n");
 	printf("-p <p> = Use (approximately) <p> polygons to render scene\n");
 	printf("-s = Use stereographic rendering initially\n");
 	printf("     (this can be switched on and off in the application)\n");
-	printf("-fs = Full-screen mode\n");
+	printf("-f <n> = max frames to render\n");
+	printf("-bt <t> = print benchmark results every <t> seconds (default=%.1f)\n",
+		DEFBENCHTIME);
+	printf("-w <wxh> = specify window width and height\n");
+	printf("-ic = Use indirect rendering context\n");
+	printf("\n");
 	exit(0);
 }
 
@@ -358,9 +375,18 @@ int main(int argc, char **argv)
 	{
 		if(!strnicmp(argv[i], "-h", 2)) usage(argv);
 		if(!strnicmp(argv[i], "-?", 2)) usage(argv);
-		if(!strnicmp(argv[i], "-i", 2)) interactive=1;
+		else if(!strnicmp(argv[i], "-i", 2)) interactive=1;
 		if(!strnicmp(argv[i], "-l", 2)) locolor=1;
 		if(!strnicmp(argv[i], "-m", 2)) useimm=1;
+		if(!strnicmp(argv[i], "-w", 2) && i<argc-1)
+		{
+			int w=0, h=0;
+			if(sscanf(argv[++i], "%dx%d", &w, &h)==2 && w>0 && h>0)
+			{
+				winwidth=w;  winheight=h;
+				printf("Window dimensions: %d x %d\n", width, height);
+			}
+		}
 		if(!strnicmp(argv[i], "-p", 2) && i<argc-1)
 		{
 			int npolys=atoi(argv[++i]);
@@ -377,6 +403,21 @@ int main(int argc, char **argv)
 			winstyle=WS_EX_TOPMOST | WS_POPUP | WS_VISIBLE;
 			fullscreen=1;
 		}
+		else if(!strnicmp(argv[i], "-f", 2) && i<argc-1)
+		{ 
+			int mf=atoi(argv[++i]); 
+			if(mf>0)
+			{
+				maxframes=mf;
+				printf("Number of frames to render: %d\n", maxframes);
+			}
+		}
+		if(!strnicmp(argv[i], "-bt", 3) && i<argc-1)
+		{
+			double temp=atof(argv[++i]);
+			if(temp>0.0) benchtime=temp;
+		}
+
 		if(!strnicmp(argv[i], "-s", 2))
 		{
 			pfd.dwFlags|=PFD_STEREO;
